@@ -495,9 +495,25 @@ jobs:
           # absence-of-error: an empty list and a failed glob look identical,
           # and filing an empty doc-sync issue trains people to close them
           # unread — which is the reason the old bridge gated on a real delta.
-          PACKAGES=$(for f in at-*/package.json; do
-            node -p "const j = require('./$f'); j.name + '@' + j.version"
-          done | sort)
+          #
+          # ⚠️ Enumerated INSIDE node, not by a shell glob. The first version
+          # globbed `at-*/package.json` and ran node per match, which made the
+          # COUNT guard below UNREACHABLE in the case it names: with no matches
+          # bash leaves the glob literal, node throws MODULE_NOT_FOUND, and
+          # `set -euo pipefail` kills the step before COUNT is computed. The job
+          # still failed, so nothing unsafe shipped — but the operator got a node
+          # stack trace instead of the message written for them, and the guard
+          # read as protection while being dead code. Measured, not reasoned.
+          PACKAGES=$(node -e "
+            const { readdirSync, existsSync, readFileSync } = require('node:fs')
+            const out = readdirSync('.')
+              .filter((d) => d.startsWith('at-') && existsSync(d + '/package.json'))
+              .map((d) => JSON.parse(readFileSync(d + '/package.json', 'utf8')))
+              .filter((j) => !j.private && j.name && j.version)
+              .map((j) => j.name + '@' + j.version)
+              .sort()
+            process.stdout.write(out.join('\n'))
+          ")
           COUNT=$(printf '%s\n' "$PACKAGES" | grep -c . || true)
           if [ "$COUNT" -eq 0 ]; then
             echo "::error::No at-* packages found — refusing to file an empty doc-sync issue."
@@ -530,9 +546,17 @@ jobs:
           # The repo name is not decoration: two producers can carry the same tag.
           TITLE="doc-sync needed: noy-db-at $TAG @$CHANNEL"
 
+          # ⚠️ The "first match" is taken IN JQ, not by `| head -1`. Under
+          # `set -o pipefail` a `head -1` closing the pipe early makes the
+          # producer take SIGPIPE and the step exit 141 — and that happens only
+          # when TWO OR MORE open issues share this exact title, which is
+          # precisely the duplicate case this search exists to detect. The
+          # recovery path would have died in the one situation it was for.
+          # Measured: `set -euo pipefail; x=$(seq 1 200000 | head -1)` -> 141.
           NUM=$(gh issue list -R vLannaAi/noy-db-docs --state open --limit 20 \
             --search "$TITLE in:title" \
-            --json number,title --jq ".[] | select(.title == \"$TITLE\") | .number" | head -1)
+            --json number,title \
+            --jq "[.[] | select(.title == \"$TITLE\") | .number] | first // empty")
 
           if [ -n "$NUM" ]; then
             gh issue comment "$NUM" -R vLannaAi/noy-db-docs --body-file /tmp/doc-sync.md
