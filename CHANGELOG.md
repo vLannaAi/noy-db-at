@@ -105,13 +105,25 @@ and must therefore correct a bad entry *alongside*, in the next one.
   construct exits 0 in 15 of 15 runs. The claim that it "would have died in the
   duplicate case" was mechanism-verified but consequence-unrun.
 
-  ⚠️ **And the safety margin is a race, not a threshold.** At 100 lines the same
-  command exits 141 in **13 of 15 runs** and 0 in the other 2 — it depends on the
-  producer still writing when `head` closes, not on a size cutoff. So the fix is
-  kept for a reason that survives: the `jq` form cannot start failing if
-  `--limit` is ever raised, whereas the pipe form would begin failing
-  intermittently, in the duplicate case only — the worst possible place for a
-  latent bug.
+  ⚠️ **And the safety margin is a race, not a threshold — so it is stated as a
+  condition, not a number.** Whether it fires depends on the producer still
+  *writing* when `head` closes, which is scheduling rather than arithmetic. The
+  onset is not portable: measured 15× per size on two machines, 100 lines failed
+  13/15 on one and 0/15 on the other, whose onset sat near 8000 — about 40×
+  apart. Two contradictory single samples of a race look exactly like two
+  disagreeing measurements of a constant, and the tell is that the disagreement
+  is over a number neither party repeated.
+
+  The honest statement: **at `--limit 20` it did not fire in 30 runs across two
+  machines, and any increase re-opens the question on every machine it runs on.**
+  Do not read a safe size out of this paragraph — that is the mistake it exists
+  to prevent.
+
+  So the `jq` form is kept for a reason that survives: it depends on neither
+  output size nor scheduling. The pipe form would begin failing intermittently,
+  in the duplicate case only — the worst possible place for a latent bug — and
+  the edit that would trigger it (raising `--limit`) is an entirely reasonable
+  one.
 
 ### Removed
 
