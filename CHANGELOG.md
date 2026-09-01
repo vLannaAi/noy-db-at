@@ -81,6 +81,38 @@ and must therefore correct a bad entry *alongside*, in the next one.
   providers. In this family the prefix is the layer, not a naming convention, so
   the vocabulary is load-bearing rather than cosmetic.
 
+### Changed
+
+- **Two guards in the `notify-docs` job made reachable in the cases they name.**
+  Neither could have shipped a wrong doc-sync issue — the step fails either way —
+  but each was dead code in exactly the situation it was written for.
+
+  *The empty-list guard could not fire on an empty glob* (**was live**). The list
+  was built by globbing `at-*/package.json` and running node per match; with no
+  matches bash leaves the glob literal, node throws `MODULE_NOT_FOUND`, and
+  `set -euo pipefail` kills the step before `COUNT` is computed — a stack trace
+  instead of the message written for the operator. Now enumerated inside node,
+  and mutation-checked with controls: empty tree → the guard's own message;
+  one package → `COUNT=1`; private-only → refused. The private exclusion is new
+  behaviour: the root manifest is not published, so it must not be listed.
+
+  *`| head -1` under `pipefail`* (**latent, not live**). `head` closing the pipe
+  can SIGPIPE the producer, which `pipefail` propagates and `set -e` turns into
+  exit 141. Replaced with a `jq`-side first-match, removing the pipe.
+
+  ⚠️ **This one was never reachable here, and the first analysis overstated it.**
+  `gh issue list --limit 20` emits at most ~100 bytes, and at 20 lines the
+  construct exits 0 in 15 of 15 runs. The claim that it "would have died in the
+  duplicate case" was mechanism-verified but consequence-unrun.
+
+  ⚠️ **And the safety margin is a race, not a threshold.** At 100 lines the same
+  command exits 141 in **13 of 15 runs** and 0 in the other 2 — it depends on the
+  producer still writing when `head` closes, not on a size cutoff. So the fix is
+  kept for a reason that survives: the `jq` form cannot start failing if
+  `--limit` is ever raised, whereas the pipe form would begin failing
+  intermittently, in the duplicate case only — the worst possible place for a
+  latent bug.
+
 ### Removed
 
 - **The `docs-bridge` job, which could never have run.** It invoked
