@@ -13,9 +13,9 @@ name: Release to npm
 #
 # ── npm dist-tag routing ─────────────────────────────────────────────
 #
-#   • `latest` — the default install (`pnpm add @noy-db/to-aws-s3`). Used
+#   • `latest` — the default install (`pnpm add @noy-db/at-env`). Used
 #     for stable themed releases.
-#   • `next`   — opt-in early-adopter channel (`pnpm add @noy-db/to-aws-s3@next`).
+#   • `next`   — opt-in early-adopter channel (`pnpm add @noy-db/at-env@next`).
 #
 # Routing rules:
 #   - `release` event with `prerelease: true` (the "Set as a pre-release"
@@ -277,9 +277,9 @@ jobs:
           echo "- **Reason:** $REASON" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           if [ "$TAG" = "latest" ]; then
-            echo "Consumers run \`pnpm add @noy-db/to-aws-s3\` (default install)." >> "$GITHUB_STEP_SUMMARY"
+            echo "Consumers run \`pnpm add @noy-db/at-env\` (default install)." >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "Consumers run \`pnpm add @noy-db/to-aws-s3@$TAG\` (opt-in channel)." >> "$GITHUB_STEP_SUMMARY"
+            echo "Consumers run \`pnpm add @noy-db/at-env@$TAG\` (opt-in channel)." >> "$GITHUB_STEP_SUMMARY"
           fi
 
       # Check which npm account the token belongs to. If this step fails,
@@ -323,7 +323,7 @@ jobs:
           echo "- Release: \`${{ github.event.release.tag_name || github.ref_name }}\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- npm dist-tag: \`${{ steps.dist_tag.outputs.tag }}\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Provenance: enabled (look for the ✓ on https://www.npmjs.com/package/@noy-db/to-aws-s3)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Provenance: enabled (look for the ✓ on https://www.npmjs.com/package/@noy-db/at-env)" >> "$GITHUB_STEP_SUMMARY"
 
   # ── Align dist-tags after a STABLE publish ───────────────────────────
   #

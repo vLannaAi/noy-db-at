@@ -1,6 +1,6 @@
 {
   "name": "@noy-db/at-macos-keychain",
-  "version": "0.7.0-pre.17",
+  "version": "0.7.0",
   "description": "macOS Keychain sealing key provider for noy-db managed-secret mode \u2014 AES-256-GCM under a 32-byte key stored in the user's login Keychain. Desktop-app provider in the at-* family; pairs with Touch ID via Keychain Access UI.",
   "license": "MIT",
   "author": "vLannaAi <vicio@lanna.ai>",
@@ -42,7 +42,7 @@
   },
   "peerDependencies": {
     "@napi-rs/keyring": "^1.1.0",
-    "@noy-db/hub": "^0.7.0-pre.17"
+    "@noy-db/hub": "^0.7.0"
   },
   "peerDependenciesMeta": {
     "@napi-rs/keyring": {
@@ -51,10 +51,10 @@
   },
   "devDependencies": {
     "@napi-rs/keyring": "^1.1.0",
-    "@noy-db/hub": "0.7.0-pre.17",
-    "@noy-db/on-shamir": "0.7.0-pre.17",
-    "@noy-db/test-sealer-conformance": "0.7.0-pre.17",
-    "@noy-db/to-memory": "0.7.0-pre.17",
+    "@noy-db/hub": "0.7.0",
+    "@noy-db/on-shamir": "0.7.0",
+    "@noy-db/test-sealer-conformance": "0.7.0",
+    "@noy-db/to-memory": "0.7.0",
     "@types/node": "^22.0.0"
   },
   "keywords": [
