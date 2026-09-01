@@ -1,4 +1,4 @@
-// check-peer-floor — does every store actually COMPILE against the oldest
+// check-peer-floor — does every provider actually COMPILE against the oldest
 // @noy-db/hub its peer range admits?
 //
 // Why this exists, and why it is separate from check-architecture.mjs:
@@ -6,28 +6,37 @@
 // `hub-peer-range` in check-architecture asserts the peer is *a range*. It
 // cannot assert the range is *true*, because truth requires resolving symbols
 // out of a hub version that is not installed. Every other gate in this repo —
-// build, lint, typecheck, 1717 tests — runs against the DEV PIN, so all of them
-// stay green no matter how wrong the declared range is. The dev pin is a proxy
-// for the range, and it always answers reassuringly.
+// build, lint, typecheck, the whole suite — runs against the DEV PIN, so all of
+// them stay green no matter how wrong the declared range is. The dev pin is a
+// proxy for the range, and it always answers reassuringly.
 //
-// That gap shipped twice:
+// ⚠️ THE TWO INCIDENTS BELOW ARE noy-db-to's, NOT THIS REPO'S. The ported header
+// told them as if they had happened here, and one of its numbers escaped into
+// release.yml as a claim about at-* packages that was never true (see the
+// prerelease-routing guard there). They are kept because the MECHANISM is what
+// justifies compiling rather than grepping, and that transfers exactly. The
+// anecdotes do not: this repo has five sealing-key providers and has never
+// shipped a to-* store. Issue numbers are noy-db-to's.
 //
-//   #89  16 packages advertised ^0.3.0 || ^0.4.0 || ^0.5.0 while importing
-//        StoreLocator / StoreDescriptor / StoreFactory, which exist only from
-//        0.6.0-pre. `npm i @noy-db/to-postgres @noy-db/hub` satisfied the peer
-//        check and then failed to typecheck. The same defect was live on the
-//        0.5.0 stable line and had to be repaired by deprecating 17 versions.
+//   to#89  16 packages advertised ^0.3.0 || ^0.4.0 || ^0.5.0 while importing
+//          StoreLocator / StoreDescriptor / StoreFactory, which exist only from
+//          0.6.0-pre. `npm i @noy-db/to-postgres @noy-db/hub` satisfied the peer
+//          check and then failed to typecheck. The same defect was live on that
+//          repo's 0.5.0 stable line and had to be repaired by deprecating 17
+//          versions — THE ORIGIN OF THE "17" that release.yml later mis-attributed
+//          to at-*@0.5.0, none of which is deprecated (measured 2026-09-01).
 //
-//   #84  to-drive / to-icloud register a NoydbPodStore factory without a cast,
-//        which needs StoreLocator.register() to be generic over both store
-//        shapes — landed in 0.6.0-pre.11. SYMBOL PRESENCE DOES NOT CATCH THIS:
-//        StoreFactory exists at 0.6.0-pre.0, it just cannot accept the
-//        argument. Only compiling against the floor finds it.
+//   to#84  to-drive / to-icloud register a NoydbPodStore factory without a cast,
+//          which needs StoreLocator.register() to be generic over both store
+//          shapes — landed in 0.6.0-pre.11. SYMBOL PRESENCE DOES NOT CATCH THIS:
+//          StoreFactory exists at 0.6.0-pre.0, it just cannot accept the
+//          argument. Only compiling against the floor finds it.
 //
 // So this check COMPILES; it does not grep. That distinction is the whole
 // point and should not be optimised away.
 //
-// Cost: one `pnpm install` per DISTINCT floor (currently two), not per package.
+// Cost: one `pnpm install` per DISTINCT floor (currently one — all five providers
+// declare ^0.7.0), not per package.
 // Intended for CI, not for the lint path — it needs the network.
 //
 // Usage:  node scripts/check-peer-floor.mjs
@@ -157,7 +166,7 @@ const groups = planGroups()
 // this run does not have.
 const checked = [...groups.values()].reduce((n, pkgs) => n + pkgs.length, 0)
 const total = storeDirs().length
-const scope = checked === total ? `${total} stores` : `${checked} of ${total} stores (${total - checked} skipped — no peer range)`
+const scope = checked === total ? `${total} providers` : `${checked} of ${total} providers (${total - checked} skipped — no peer range)`
 console.log(`Peer-floor check — ${groups.size} distinct floor(s) across ${scope}\n`)
 for (const [floor, pkgs] of groups) {
   console.log(`  @noy-db/hub@${floor}`)
@@ -252,7 +261,7 @@ if (failures.length) {
   console.error('consumers hit it as a broken install, not as a refused one.')
   process.exit(1)
 }
-console.log('✓ every store compiles against the oldest @noy-db/hub its peer range admits')
+console.log('✓ every provider compiles against the oldest @noy-db/hub its peer range admits')
 }
 
 if (isMain) main()

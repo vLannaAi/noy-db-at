@@ -22,17 +22,24 @@
  * but do NOT copy two of its choices, both deliberate there and wrong here:
  *
  *   1. It carries a HARDCODED package list (`PRE_ONLY`), currently empty, so it
- *      is a no-op until someone remembers to add a name. This repo has the scar
- *      that argues against that: the docs-bridge WIRING table was a hardcoded
- *      list, `to-browser-fs` debuted as the 18th store and was never added, and
- *      the bridge threw on TWO releases while both runs reported success. We
- *      DERIVE the list from the filesystem instead.
+ *      is a no-op until someone remembers to add a name. We DERIVE the list from
+ *      the filesystem instead, because a hardcoded list is only correct until the
+ *      next package is added, and it fails SILENTLY when it stops being correct.
+ *
+ *      ⚠️ The scar that argues for this is noy-db-to's, not ours — the ported
+ *      text said "this repo has the scar", which was never true here. There, the
+ *      docs-bridge WIRING table was a hardcoded list, `to-browser-fs` debuted as
+ *      the 18th store and was never added, and the bridge threw on TWO releases
+ *      while both runs reported success. The reasoning transfers to this repo
+ *      exactly; the anecdote does not, and stating someone else's incident as
+ *      your own is how a justification survives past the point anyone can check
+ *      it. (This repo has five packages and has never shipped a to-* store.)
  *
  *   2. It never fails its caller, on the reasoning that a wedged tag is
  *      cosmetic and a red release trains people to stop reading logs. That is
  *      right for a pre-only repoint. It is wrong here: a package left behind
  *      leaves `@next` pointing at something older than `@latest`, which is a
- *      wrong answer to `npm i @noy-db/to-x@next`, not a cosmetic one. This
+ *      wrong answer to `npm i @noy-db/at-x@next`, not a cosmetic one. This
  *      script EXITS NON-ZERO on any failure.
  *
  * ## Usage

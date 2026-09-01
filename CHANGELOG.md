@@ -52,6 +52,53 @@ and must therefore correct a bad entry *alongside*, in the next one.
   over from `noy-db-to`. Corrected to `@noy-db/at-env`. Both workflow headers also
   described these packages as "storage adapters"; they are sealing-key providers.
 
+- **An expired justification, one clause of which reached maintainers as a live
+  error.** `release.yml`'s prerelease-routing guard told anyone who tripped it
+  that `@latest` was *"already broken here (17 deprecated 0.5.0 versions)"*.
+  Every clause was false for this repo, measured 2026-09-01: five packages, not
+  17; `@0.5.0` deprecated is empty for all five (controlled against a
+  known-deprecated package, so the empty result is an answer and not a broken
+  query); `@latest` is `0.7.0`, a healthy stable; and the stable the comment
+  called "blocked" has shipped.
+
+  The **guard is correct and stays** — a semver prerelease routed to `@latest` is
+  a real hazard. Only its justification expired, so the condition was replaced
+  with the reason, which cannot. The "17" was traced to its origin:
+  `check-peer-floor.mjs`'s header records noy-db-to's #89 being repaired by
+  deprecating 17 `to-*` versions, and `release.yml` had re-pointed that number at
+  `at-*` packages.
+
+- **Three more borrowed justifications corrected in place**, all telling another
+  repo's incident as this repo's own: `check-peer-floor.mjs` claimed "1717 tests"
+  (this repo has 95) and "currently two" distinct peer floors (measured: one),
+  and attributed noy-db-to's #89/#84 locally; `align-dist-tags.mjs` said "this
+  repo has the scar" about a `to-browser-fs` incident that happened elsewhere.
+  The reasoning transfers exactly and was kept; the attribution did not and was
+  fixed. Stating someone else's incident as your own is how a justification
+  survives past the point anyone can check it.
+
+- **`check-peer-floor.mjs` called these packages "stores".** They are sealing-key
+  providers. In this family the prefix is the layer, not a naming convention, so
+  the vocabulary is load-bearing rather than cosmetic.
+
+### Removed
+
+- **The `docs-bridge` job, which could never have run.** It invoked
+  `scripts/docs-bridge/build-payload.mjs` and
+  `scripts/__tests__/docs-bridge-capabilities.test.ts`, neither of which was
+  extracted into this repo. Being `continue-on-error: true`, a release would have
+  published, the job would have died at "Build payload", and **the run would
+  still have reported green** — producing neither half of the proof pair.
+
+  Porting the scripts was not the fix: noy-db-to's `build-payload.mjs` filters
+  `d.name.startsWith('to-')`, which matches nothing here, so a verbatim port
+  trades a job that fails green for one that fails red and still never notifies
+  docs. The intended replacement is a direct `gh issue create` — what
+  noy-db-docs actually consumes is the issue body — but that needs a token
+  scoped to their repo and their agreement, so it is **not yet wired**. The
+  honest interim state is the job absent rather than lying; noy-db-docs has a
+  documented fallback for the no-issue case.
+
 ### Added
 
 - **`pnpm version:set <version>`** — sets every package to one version and rewrites
