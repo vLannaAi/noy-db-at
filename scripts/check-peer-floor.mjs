@@ -160,7 +160,7 @@ export function planGroups() {
 function main() {
 const groups = planGroups()
 
-// Report what was actually GROUPED, not how many stores exist. A package whose
+// Report what was actually GROUPED, not how many providers exist. A package whose
 // peer range is absent or empty is skipped above (check-architecture fails it
 // by name, and exits 1), and printing the directory count would claim coverage
 // this run does not have.
@@ -205,13 +205,13 @@ try {
       continue
     }
 
-    // Build the group AND its workspace dependencies first. Several stores
+    // Build the group AND its workspace dependencies first. Several providers
     // import a sibling (to-cloudflare-r2 → to-aws-s3, to-supabase →
     // to-postgres) and resolve it through the workspace link, whose `types`
     // field points into dist/. Without this the typecheck fails with TS2307
     // "Cannot find module" — which looks exactly like a peer-range failure and
     // is not one. The `...` suffix pulls in each package's workspace deps, so
-    // the build stays inside this group's floor rather than rebuilding stores
+    // the build stays inside this group's floor rather than rebuilding providers
     // that declare a different one.
     const buildFilters = pkgs.flatMap((p) => ['--filter', `${p.name}...`])
     try {
