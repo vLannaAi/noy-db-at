@@ -1,6 +1,6 @@
 name: Release to npm
 
-# Strict release pipeline for the noy-db-at storage adapters.
+# Strict release pipeline for the noy-db-at sealing-key providers.
 #
 # Triggered on GitHub Release `published`. Runs the full verification
 # gate (install + build + lint + typecheck + test) on a clean checkout
@@ -110,19 +110,59 @@ jobs:
       - name: Test
         run: pnpm test
 
-      # The root package.json version is the lockstep canonical for the repo.
-      # Per-store version==tag enforcement (Step 1b) is added when stores land.
-      - name: Verify package.json version matches release tag
+      # ── Version gates ────────────────────────────────────────────────
+      #
+      # This repo has no changesets: `pnpm version:set <v>` moves every package
+      # at once, and these three steps are what make that safe.
+      #
+      # ⚠️ This REPLACES a step ported from noy-db-to that read the version from
+      # the ROOT package.json as "the lockstep canonical for the repo". That is
+      # true there and false here: this repo's root manifest is `private: true`
+      # and carries NO version field, so `node -p "require('./package.json')
+      # .version"` evaluated to the string "undefined", never matched any tag,
+      # and would have failed every release before it reached publish. The
+      # ported comment said per-package enforcement would be "added when stores
+      # land" — the packages landed at extraction and the step was never
+      # revisited.
+      - name: One version line across the workspace
+        run: pnpm check:versions-uniform
+
+      # Every PUBLISHABLE package must match the tag. Reading the version from
+      # the packages rather than from a root canonical is what makes this true
+      # of what actually gets published.
+      - name: Verify package versions match release tag
         if: github.event_name == 'release'
         run: |
           TAG="${{ github.event.release.tag_name }}"
           VERSION="${TAG#v}"
-          PKG_VERSION=$(node -p "require('./package.json').version")
-          if [ "$PKG_VERSION" != "$VERSION" ]; then
-            echo "❌ noy-db-at storage adapters version ($PKG_VERSION) does not match release tag ($VERSION)"
-            exit 1
-          fi
-          echo "✅ noy-db-at@$PKG_VERSION matches release tag v$VERSION"
+          node -e "
+            const { readdirSync, readFileSync, existsSync } = require('node:fs')
+            const want = process.argv[1]
+            const dirs = readdirSync('.').filter(
+              (d) => !d.startsWith('.') && d !== 'node_modules' && d !== 'scripts' &&
+                     existsSync(d + '/package.json'))
+            const pkgs = dirs.map((d) => JSON.parse(readFileSync(d + '/package.json', 'utf8')))
+                             .filter((j) => !j.private)
+            if (!pkgs.length) { console.error('no publishable packages found'); process.exit(1) }
+            const bad = pkgs.filter((j) => j.version !== want)
+            for (const j of bad) console.error('  ' + j.name + '@' + j.version + ' != tag ' + want)
+            if (bad.length) {
+              console.error('\n' + bad.length + ' of ' + pkgs.length + ' package(s) do not match the release tag.')
+              process.exit(1)
+            }
+            console.log('all ' + pkgs.length + ' package(s) at ' + want + ', matching release tag v' + want)
+          " "$VERSION"
+
+      # The executable form of "git is not npm", in the direction that bit this
+      # repo: the REGISTRY ran ahead of the source. Core published 0.7.0 for the
+      # whole lockstep line after this repo's extraction snapshot, so all five
+      # manifests said 0.7.0-pre.17 while npm carried 0.7.0. Every local gate was
+      # green, because every local gate reads only local state.
+      #
+      # Exit 2 means "could not confirm" (registry unreachable), which is NOT
+      # the same as "free to publish" and fails the job rather than waving it on.
+      - name: This version is not already published
+        run: pnpm check:not-already-published
 
       # The dist-tag is routed entirely by the "Set as a pre-release" checkbox on
       # the Release form, so a forgotten tick publishes a pre-release to @latest.

@@ -1,6 +1,6 @@
 name: CI
 
-# Standard CI for noy-db-at: the non-essential @noy-db/at-* storage adapters.
+# Standard CI for noy-db-at: the @noy-db/at-* sealing-key providers.
 # Multi-package pnpm workspace: check:architecture → install → build → lint → typecheck → test
 # across the runtime-supported Node versions (22 + 24).
 
@@ -50,6 +50,20 @@ jobs:
       # green either way (measured). Only a static check sees it.
       - name: Every package declares what it uses
         run: pnpm check:declared-deps
+      # This repo publishes as ONE version line and has no changesets, so
+      # nothing computes a dependency closure — `pnpm version:set` moves every
+      # package at once. What that cannot guarantee is that it RAN everywhere.
+      # A partial bump is silent: it builds, typechecks and tests green, and
+      # surfaces only at publish time. Stated as an invariant (all versions are
+      # equal) rather than a pinned string, so it is not edited every release.
+      #
+      # NOTE the sibling gate `check:not-already-published` is deliberately NOT
+      # here. Between releases a repo's current version IS published, so on a
+      # PR it would be correctly and permanently red. It runs on the release
+      # path, where "am I about to publish a taken version" is the live
+      # decision — see release.yml.
+      - name: One version line across the workspace
+        run: pnpm check:versions-uniform
       # This repo answers for the codemod rows naming ITS packages. hub shipped
       # them and can no longer check them — the packages moved here, so the
       # obligation did too. Nothing compiles a migration map.
