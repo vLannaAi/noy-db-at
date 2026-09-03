@@ -81,7 +81,15 @@ for (const { json } of pkgs) {
       if (!names.has(dep)) continue
       internalEdges++
       if (theVersion === null) continue
-      if (!semver.satisfies(theVersion, range, { includePrerelease: true })) {
+      // NO { includePrerelease: true } here, deliberately and load-bearing. npm and
+      // pnpm do NOT pass that flag, so setting it makes this gate strictly MORE
+      // permissive than the resolver it exists to protect — a false PASS, which no
+      // test can catch because its failure mode is agreeing with you. Measured band
+      // for ^0.7.0: both edges agree (0.7.0-pre.0, 0.8.0-pre.0), and divergence is
+      // exactly a prerelease on a PATCH tuple inside the span (0.7.1-pre.0 ...).
+      // Run the row, do not derive it: this flag changes comparator semantics and
+      // has produced two confident inversions here already.
+      if (!semver.satisfies(theVersion, range)) {
         problems.push(
           `${json.name} → ${field}["${dep}"] = "${range}", which does NOT admit the workspace version ${theVersion}`,
         )

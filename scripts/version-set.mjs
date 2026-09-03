@@ -89,7 +89,12 @@ for (const dir of pkgDirs) {
   for (const field of DEP_FIELDS) {
     for (const [dep, range] of Object.entries(json[field] ?? {})) {
       if (!names.has(dep)) continue
-      if (semver.satisfies(target, range, { includePrerelease: true })) continue
+      // NO { includePrerelease: true } here — see check-versions-uniform.mjs. With
+      // the flag this line SKIPPED a stale-tuple range (^0.7.0 at target
+      // 0.7.1-pre.0) as already-satisfied, so version-set silently declined to
+      // normalise exactly the edges that break consumer resolution. The mitigation
+      // and the defect were one bug with opposite signs.
+      if (semver.satisfies(target, range)) continue
       const next = `^${target}`
       const re = new RegExp(`("${dep.replace('/', '\\/')}":\\s*)"[^"]*"`)
       if (!re.test(text)) {
