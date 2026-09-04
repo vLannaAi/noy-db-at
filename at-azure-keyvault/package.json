@@ -1,6 +1,6 @@
 {
   "name": "@noy-db/at-azure-keyvault",
-  "version": "0.7.0-pre.17",
+  "version": "0.7.1-pre.0",
   "description": "Azure Key Vault sealing key provider for noy-db managed-secret mode.",
   "license": "MIT",
   "author": "vLannaAi <vicio@lanna.ai>",
@@ -38,14 +38,14 @@
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
-    "@noy-db/hub": "^0.7.0-pre.17",
+    "@noy-db/hub": "^0.7.0",
     "@azure/keyvault-keys": "^4.0.0",
     "@azure/identity": "^4.0.0"
   },
   "devDependencies": {
-    "@noy-db/hub": "0.7.0-pre.17",
-    "@noy-db/on-shamir": "0.7.0-pre.17",
-    "@noy-db/to-memory": "0.7.0-pre.17",
+    "@noy-db/hub": "0.7.0",
+    "@noy-db/on-shamir": "0.7.0",
+    "@noy-db/to-memory": "0.7.0",
     "@types/node": "^22.0.0",
     "@azure/keyvault-keys": "^4.0.0",
     "@azure/identity": "^4.0.0"

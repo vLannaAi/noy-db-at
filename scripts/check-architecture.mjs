@@ -14,8 +14,8 @@ function fail(rule, msg, where) {
   console.error(`✗ [${rule}] ${msg}${where ? ` (${relative(ROOT, where)})` : ''}`)
 }
 
-// Stores are flat at the repo root: directories named `at-*` with a package.json.
-function listStoreDirs() {
+// Providers are flat at the repo root: directories named `at-*` with a package.json.
+function listProviderDirs() {
   if (!existsSync(ROOT)) return []
   return readdirSync(ROOT)
     .filter(name => name.startsWith('at-'))
@@ -41,7 +41,7 @@ function walkTs(dir, cb) {
 // Rule 1 — hub-peer-range: @noy-db/hub must be a peerDependency at a published
 // RANGE; never in dependencies, never a workspace: specifier.
 function checkHubPeerRange() {
-  for (const dir of listStoreDirs()) {
+  for (const dir of listProviderDirs()) {
     const pj = readPkg(dir)
     const dep = pj.dependencies?.['@noy-db/hub']
     const peer = pj.peerDependencies?.['@noy-db/hub']
@@ -50,13 +50,15 @@ function checkHubPeerRange() {
     if (peer === undefined)
       fail('hub-peer-range', `${pj.name} is missing peerDependencies['@noy-db/hub'].`, dir)
     else if (peer.startsWith('workspace:'))
-      fail('hub-peer-range', `${pj.name} peers @noy-db/hub as "${peer}"; cross-repo stores must use a published range (e.g. "^0.2.0-pre.31").`, dir)
+      fail('hub-peer-range', `${pj.name} peers @noy-db/hub as "${peer}"; cross-repo providers must use a published range (e.g. "^0.2.0-pre.31").`, dir)
     else if (!/^[\^~]?\d/.test(peer))
       fail('hub-peer-range', `${pj.name} peers @noy-db/hub as "${peer}"; expected a semver range.`, dir)
   }
 }
 
-// Rule 2 — to-only: store src may import @noy-db/hub ONLY via /to.
+// Rule 2 — no-runtime-store-import: a provider's src must not VALUE-import the
+// store contract. (noy-db-to calls its rule `to-only` and means nearly the
+// opposite; see the note in the function body.)
 // Covers static imports (from/import), dynamic import(), require(), and bare
 // side-effect imports (import '@noy-db/hub').
 const HUB_IMPORT_RE = /(?:from|import|require)\s*\(?\s*['"]@noy-db\/hub(\/[^'"]*)?['"]/g
@@ -80,7 +82,7 @@ function checkNoRuntimeStoreImport() {
   // below, reports the wrong statement, and misses the `type` keyword that is
   // actually there. That produced a false positive on real code.
   const SPEC = "from '@noy-db/hub/to'"
-  for (const dir of listStoreDirs()) {
+  for (const dir of listProviderDirs()) {
     const pj = readPkg(dir)
     walkTs(join(dir, 'src'), (file, code) => {
       let at = code.indexOf(SPEC)
@@ -98,15 +100,29 @@ function checkNoRuntimeStoreImport() {
   }
 }
 
-// Rule 3 — no-crypto-deps: zero npm crypto packages (stores see ciphertext only).
+// Rule 3 — no-crypto-deps: an `at-*` provider ships no crypto implementation of
+// its own.
+//
+// ⚠️ NOT because it "only sees ciphertext" — that is noy-db-to's reason and it is
+// FALSE here. `at-*` is the one family in the grammar that is not zero-knowledge:
+// a host you control decrypts the slice it unseals. Stating the ciphertext reason
+// on the rule most likely to fire on a new package would teach the wrong
+// invariant at the moment someone is looking straight at it.
+//
+// The real reason is ownership. Hub owns the primitives and EXPORTS them —
+// at-aws-kms/src/index.ts imports sealRsaOaepTlv / parseRsaOaepTlv / aesGcmOpen
+// from '@noy-db/hub' — and a provider's job is to hand key material to a KMS or a
+// keychain, not to reimplement the envelope. A second implementation inside a
+// provider is a second thing to get wrong, sitting off to one side of the audited
+// one.
 const BANNED = new Set(['crypto-js', 'node-forge', 'tweetnacl', 'bcryptjs', 'bcrypt'])
 function checkNoCryptoDeps() {
-  for (const dir of listStoreDirs()) {
+  for (const dir of listProviderDirs()) {
     const pj = readPkg(dir)
     for (const block of ['dependencies', 'devDependencies', 'peerDependencies']) {
       for (const name of Object.keys(pj[block] ?? {})) {
         if (BANNED.has(name) || name.startsWith('@noble/') || name.startsWith('@scure/'))
-          fail('no-crypto-deps', `${pj.name} depends on crypto package "${name}"; stores see ciphertext only — use @noy-db/hub.`, dir)
+          fail('no-crypto-deps', `${pj.name} depends on crypto package "${name}"; hub owns the primitives — import them from @noy-db/hub instead of bundling a second implementation.`, dir)
       }
     }
   }
