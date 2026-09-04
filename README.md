@@ -44,3 +44,5 @@ code. Do not read a green run there as a kit run.
 
 Publishing happens from a **GitHub Release** triggering `release.yml`, never a raw `npm publish`.
 Pre-1.0: public APIs may still change.
+
+<!-- ci trigger probe, delete with the branch -->
