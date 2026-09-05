@@ -386,11 +386,12 @@ jobs:
   # Pointing `next` at the stable too is self-correcting: the next pre-release
   # moves it forward and the normal invariant returns.
   #
-  # NOT continue-on-error, deliberately, and unlike the docs bridge. That job is
-  # non-fatal because a missing payload is recoverable and must not fail a
-  # publish that already succeeded. This one is different: a package left behind
-  # makes `npm i @noy-db/at-x@next` resolve something OLDER than `@latest` — a
-  # wrong answer, not a missing nicety. It must be loud.
+  # NOT continue-on-error, deliberately — and as of 2026-09-05 neither is the
+  # docs-bridge job below. That contrast used to be drawn here on the grounds
+  # that a missing payload was recoverable; under the ruled source contract it
+  # is not merely this repo's problem, so both are loud now. A package left
+  # behind makes `npm i @noy-db/at-x@next` resolve something OLDER than
+  # `@latest` — a wrong answer, not a missing nicety.
   #
   # Only fires when the publish actually routed to `latest`.
   align-dist-tags:
@@ -454,6 +455,82 @@ jobs:
   # (measured — the sync issues carry the package lines; Release bodies carry
   # none). So the list below IS the delta, and this job is the whole bridge.
   #
+  # ── The doc-sync payload (lanna-db#17 step 2) ────────────────────────
+  #
+  # Contract: noy-db-docs/docs/superpowers/specs/2026-09-05-as-on-at-doc-sync-sources-design.md
+  #
+  # ⛔ NOT continue-on-error, and this is the deliberate opposite of the job
+  # below it. Once noy-db-docs seeds this repo as a source, a tag in range with
+  # no `docs-bridge.json` asset raises BridgeAssetMissingError, which exits the
+  # WHOLE sync run — every partition, including the three that have worked since
+  # 2026-09-02, not just `at`. The operator's only recovery is `--skip-tag`,
+  # named in a commit. A silent failure here is somebody else's outage, so it
+  # must be red.
+  #
+  # It runs AFTER publish rather than gating it. A tag only enters the walk's
+  # range when the proxy package's dist-tag moves (spec §4), which requires the
+  # publish — so a failure here leaves a tag the walk never reads, and the asset
+  # can be uploaded afterwards with the same `--clobber` command. Gating publish
+  # on it would trade a recoverable red for an unpublished release.
+  #
+  # `--clobber` because §4 requires exactly one asset per release and a re-run
+  # must replace rather than duplicate.
+  docs-bridge:
+    name: Doc-sync payload
+    needs: publish
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # required to upload a release asset
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      # The builder's own tests, run here as well as in CI: this is the release
+      # path, and the tree it sees is the tag's, not main's.
+      - name: Test the payload builder
+        run: node --test scripts/docs-bridge/*.test.mjs
+
+      - name: Build and validate the payload
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          CHANNEL: ${{ needs.publish.outputs.dist_tag }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          node scripts/docs-bridge/build-payload.mjs \
+            --tag "$TAG" --channel "$CHANNEL" --run-url "$RUN_URL" > /tmp/docs-bridge.json
+
+          # assertValid already ran inside the CLI; re-assert the two facts that
+          # depend on the WORKFLOW's inputs rather than on the tree, because a
+          # wrong slug makes every release of this repo unreadable and a tag that
+          # disagrees with the version makes the manifest record something the
+          # git tag does not say (spec §3.1).
+          node -e "
+            const p = require('/tmp/docs-bridge.json')
+            if (p.repo !== 'vLannaAi/noy-db-at') { console.error('::error::payload repo is ' + p.repo); process.exit(1) }
+            if (p.tag !== 'v' + p.version) { console.error('::error::tag ' + p.tag + ' != v' + p.version); process.exit(1) }
+            if (p.tag !== process.env.TAG) { console.error('::error::payload tag ' + p.tag + ' != release tag ' + process.env.TAG); process.exit(1) }
+            console.log('payload OK: ' + p.packages.length + ' packages at ' + p.version)
+          "
+
+          {
+            echo "## Doc-sync payload"
+            echo ""
+            echo "\`docs-bridge.json\` for **$TAG** on \`@$CHANNEL\` — $(node -e "console.log(require('/tmp/docs-bridge.json').packages.length)") packages."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Attach it to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ github.event.release.tag_name }}" /tmp/docs-bridge.json --clobber
+
   # `continue-on-error` at JOB level, deliberately: by the time this runs the
   # publish has already succeeded, and a docs-side outage must not turn a
   # completed publish into a red release. The cost is that "non-fatal" and
