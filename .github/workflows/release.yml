@@ -461,10 +461,25 @@ jobs:
   # elsewhere in this family — so the `if: failure()` step below writes a loud
   # summary line. Non-fatal, never silent.
   #
-  # Requires DOCS_SYNC_TOKEN: a fine-grained PAT with Issues:write on
+  # DOCS_SYNC_TOKEN is OPTIONAL: a fine-grained PAT with Issues:write on
   # vLannaAi/noy-db-docs. This repo's own GITHUB_TOKEN cannot write there.
-  # When it is absent the step fails LOUDLY rather than skipping, because a
-  # bridge that quietly does nothing is the exact failure this job replaced.
+  #
+  # ⚠️ The absence of the token used to `exit 1` here, on the reasoning that a
+  # bridge which quietly does nothing is the failure this job replaced. That
+  # reasoning is still right and is NOT discarded — it is met differently. The
+  # delta is now written to the run summary BEFORE the token is consulted, so
+  # the no-token path is silent about nothing: the package list is produced
+  # either way, and only its DELIVERY is skipped. Erroring as well would make
+  # every release show a red job for a missing optional credential, which
+  # trains an operator to ignore the one that matters.
+  #
+  # Why this repo cannot be reached by the centralized on-demand sync instead:
+  # docs.manifest.json lists as/on/at as sources of nothing, and `pnpm sync
+  # --rail` walks a range from a release's docs-bridge.json — which this
+  # producer deliberately does not ship (see the note above). Ruled at the root
+  # 2026-09-05 (lanna-db#17): as/on/at become real sources, but noy-db-docs
+  # specs the payload contract FIRST and the payload lands BEFORE this job is
+  # retired. Do not delete this job in anticipation of that.
   notify-docs:
     name: Notify noy-db-docs
     needs: publish
@@ -484,12 +499,6 @@ jobs:
           RELEASE_URL: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ github.event.release.tag_name }}
         run: |
           set -euo pipefail
-
-          if [ -z "${GH_TOKEN:-}" ]; then
-            echo "::error::DOCS_SYNC_TOKEN is not set — noy-db-docs was NOT notified of this publish."
-            echo "::error::Add a fine-grained PAT with Issues:write on vLannaAi/noy-db-docs, or file the doc-sync by hand."
-            exit 1
-          fi
 
           # The package list is the payload. Assert a COUNT rather than
           # absence-of-error: an empty list and a failed glob look identical,
@@ -539,6 +548,20 @@ jobs:
           } > /tmp/doc-sync.md
 
           cat /tmp/doc-sync.md >> "$GITHUB_STEP_SUMMARY"
+
+          # The delta above is now recorded whatever happens next. Without a PAT
+          # this job cannot write to another repo, so it stops here GREEN rather
+          # than red: the package list is discoverable in the run summary for a
+          # human running the sync on demand. Exit 0, deliberately.
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::notice::DOCS_SYNC_TOKEN not set — no issue filed. The published package list is in this run's summary for an on-demand doc-sync."
+            {
+              echo ""
+              echo "_No \`DOCS_SYNC_TOKEN\`, so no issue was filed in \`noy-db-docs\`._"
+              echo "_The list above is the delta; run the doc-sync against it._"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
 
           # TITLE is built ONCE and reused by the search, the exact-match filter
           # and the create. If those drift, the idempotency search stops matching
