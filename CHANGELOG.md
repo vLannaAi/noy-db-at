@@ -15,7 +15,20 @@ and must therefore correct a bad entry *alongside*, in the next one.
 
 ---
 
-## Unreleased
+## 0.7.1-pre.0
+
+**This release ships functionally identical code to `0.7.0`.** No package's `src/`
+changed — verified by comparing the `sourcesContent` embedded in each published
+`0.7.0` tarball's `dist/index.js.map` against this tree, byte-identical across all
+five, and total rather than sampled because each package has exactly one source file
+and each map lists exactly that file. Read it as an ownership and tooling release, not
+as a code fix.
+
+It exists because **`0.7.0` was never this repo's to ship.** Core published it for the
+whole lockstep line on 2026-09-01, ~62 seconds after `hub@0.7.0`, while these packages
+were still inside its monorepo. This repo holds no tag for it, cut no release, and
+`check:not-already-published` correctly refused the next cut until the line moved. This
+release takes the line over and opens it.
 
 ### Fixed
 
@@ -76,6 +89,42 @@ and must therefore correct a bad entry *alongside*, in the next one.
   The reasoning transfers exactly and was kept; the attribution did not and was
   fixed. Stating someone else's incident as your own is how a justification
   survives past the point anyone can check it.
+
+- **Two scripts were laxer than the resolver they guard.** `check-versions-uniform.mjs`
+  and `version-set.mjs` both passed `{ includePrerelease: true }` to `semver.satisfies`.
+  npm and pnpm do not, so both were strictly *more permissive* than the resolution they
+  exist to protect — a false PASS, which no test catches because its failure mode is
+  agreeing with you. Measured band for `^0.7.0`: both edges agree, and divergence is
+  exactly a prerelease on a **patch tuple inside** the span, where this repo now sits.
+
+  `version-set.mjs` was the worse half: it used the flag as a *skip* condition, so a
+  stale-tuple internal range was judged already-satisfied and never rewritten — the
+  mitigation and the defect were one bug with opposite signs. Proven with a probe edge
+  rather than by reading: before, the range survived untouched while the gate reported
+  `1 internal range(s) admit it` and npm would `ERESOLVE`; after, it is rewritten and
+  the count is true.
+
+- **CI did not run on a stacked pull request.** `pull_request: branches: [main]` filters
+  on the **base** branch, so a PR stacked on a feature branch triggered nothing. The
+  symptom here was not "no checks" but **partial green**: `peer-floor.yml` carries a
+  `paths` filter and no branches filter, so a stacked PR touching a package manifest
+  showed one passing check and no CI at all — which reads as success. Found only by
+  enumerating the `on:` block of every workflow rather than the one named in the report,
+  and witnessed with a throwaway stacked probe PR, since a PR based on `main` would have
+  been green under the old filter too.
+
+- **`check-architecture.mjs` explained itself with `noy-db-to`'s invariant.** Rule 3
+  (`no-crypto-deps`) said *"stores see ciphertext only"* — false here, since `at-*` is
+  the one family in the grammar that is **not** zero-knowledge, and it is the rule most
+  likely to fire on a new package, so it taught the wrong invariant at the moment
+  someone was looking straight at it. The reason is ownership: hub owns the primitives
+  and exports them, and a provider hands key material to a KMS or keychain rather than
+  reimplementing the envelope.
+
+  Rule 2's header was worse — it read `to-only: store src may import @noy-db/hub ONLY
+  via /to` and **contradicted the note five lines below it**, so the file asserted a
+  rule and then denied it. Also `listStoreDirs` → `listProviderDirs`, that name being
+  what kept generating store-flavoured prose.
 
 - **`check-peer-floor.mjs` called these packages "stores".** They are sealing-key
   providers. In this family the prefix is the layer, not a naming convention, so
@@ -138,10 +187,19 @@ and must therefore correct a bad entry *alongside*, in the next one.
   `d.name.startsWith('to-')`, which matches nothing here, so a verbatim port
   trades a job that fails green for one that fails red and still never notifies
   docs. The intended replacement is a direct `gh issue create` — what
-  noy-db-docs actually consumes is the issue body — but that needs a token
-  scoped to their repo and their agreement, so it is **not yet wired**. The
-  honest interim state is the job absent rather than lying; noy-db-docs has a
-  documented fallback for the no-issue case.
+  noy-db-docs actually consumes is the issue body. That replacement is now wired as the
+  `notify-docs` job — see *Changed* below.
+
+- **`DOCS_SYNC_TOKEN` is now optional.** `notify-docs` previously exited 1 the moment
+  the token was absent, so every release without the PAT showed a red job and a
+  *"noy-db-docs was NOT notified"* banner. The reasoning behind that hard failure — a
+  bridge that quietly does nothing is the failure the job replaced — is met rather than
+  discarded: the package delta is computed and written to the run summary **before** the
+  token is consulted, so the no-token path is silent about nothing and only *delivery*
+  is skipped. Erroring as well would show a red job for a missing optional credential on
+  every release, which trains an operator to ignore the one that matters. The
+  `COUNT == 0` guard still exits 1 — no packages found is a real defect, not a missing
+  credential.
 
 ### Added
 
@@ -179,12 +237,10 @@ and must therefore correct a bad entry *alongside*, in the next one.
   checking their own reading, which is precisely what an external kit exists to
   break. Tracked as `noy-db-at#5`.
 
-- **The `docs-bridge` job in `release.yml` cannot run here.** It invokes
-  `scripts/docs-bridge/build-payload.mjs` and
-  `scripts/__tests__/docs-bridge-capabilities.test.ts`, neither of which exists in
-  this repo — both were left behind at extraction. Because the job is
-  `continue-on-error: true`, a release would publish, the job would fail at "Build
-  payload", and **the run would still report green**, with neither half of the
-  documented proof pair (payload asset attached, doc-sync issue filed in
-  `noy-db-docs`) produced. Whether to port the scripts or drop the job is a
-  cross-repo decision and is not being made here.
+- **This repo ships no `docs-bridge.json`, so the centralized doc-sync cannot see it.**
+  `noy-db-docs`' on-demand sync walks a range from a release's payload asset, and
+  `docs.manifest.json` lists `as`/`on`/`at` as sources of nothing. That is why
+  `notify-docs` exists and why deleting it would remove the warning along with the
+  notification. Ruled at the root on 2026-09-05 (`lanna-db#17`): these three become real
+  sources, `noy-db-docs` specs the payload contract first, and the payload lands before
+  `notify-docs` retires. Not built here yet.
