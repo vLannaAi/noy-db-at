@@ -9,6 +9,7 @@
     "check:codemod-rows": "node scripts/check-codemod-rows.mjs",
     "check:declared-deps": "node scripts/check-declared-deps.mjs",
     "check:not-already-published": "node scripts/check-not-already-published.mjs",
+    "check:docs-bridge": "node --test scripts/docs-bridge/*.test.mjs",
     "check:peer-floor": "node scripts/check-peer-floor.mjs",
     "check:versions-uniform": "node scripts/check-versions-uniform.mjs",
     "lint": "pnpm -r lint",

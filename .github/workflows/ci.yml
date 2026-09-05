@@ -51,6 +51,14 @@ jobs:
         run: pnpm build
       - name: Architecture invariants
         run: pnpm check:architecture
+
+      # The doc-sync payload builder's own tests. They run under `node --test`,
+      # not vitest, so they are invisible to `pnpm test` — this repo's
+      # vitest.config.ts globs at-* projects only, and a test file under
+      # scripts/ would sit in the tree and never run. Wired explicitly here so
+      # that cannot happen silently.
+      - name: Doc-sync payload builder
+        run: pnpm check:docs-bridge
       # Catches a dependency a package USES but never DECLARES. The test suite
       # cannot: a sibling declaring it satisfies pnpm's store, so the suite goes
       # green either way (measured). Only a static check sees it.
